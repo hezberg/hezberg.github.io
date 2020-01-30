@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+<meta name="theme-color" content="#f8f5ec" />
+<meta name="msapplication-navbutton-color" content="#f8f5ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="#f8f5ec">
+
+<meta name="description" content="Effective C++ - Resource Management"/><meta name="keywords" content="cpp, RAII, mumbo jumbo" /><link rel="alternate" href="/atom.xml" title="mumbo jumbo"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2.11.0" />
+<link rel="canonical" href="hezberg.github.io/2020/effective-cpp-notes/"/>
+
+<link rel="stylesheet" type="text/css" href="/lib/fancybox/jquery.fancybox.css" />
+<link rel="stylesheet" type="text/css" href="/css/style.css?v=2.11.0" />
+
+<script id="baidu_push">
+(function(){
+    var bp = document.createElement('script');
+    var curProtocol = window.location.protocol.split(':')[0];
+    if (curProtocol === 'https') {
+        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';
+    }
+    else {
+        bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+    }
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(bp, s);
+})();
+</script>
+<script>
+  window.config = {"leancloud":{"app_id":null,"app_key":null},"toc":true,"fancybox":true,"pjax":"","latex":false};
+</script>
+
+    <title>Effective C++ - Resource Management - mumbo jumbo</title>
+  <meta name="generator" content="Hexo 4.2.0"><link rel="alternate" href="/atom.xml" title="mumbo jumbo" type="application/atom+xml">
+<link rel="stylesheet" href="/css/prism-material-light.css" type="text/css">
+<link rel="stylesheet" href="/css/prism-line-numbers.css" type="text/css"></head>
+
+  <body><div id="mobile-navbar" class="mobile-navbar">
+  <div class="mobile-header-logo">
+    <a href="/." class="logo">mumbo jumbo</a>
+  </div>
+  <div class="mobile-navbar-icon">
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+</div>
+
+<nav id="mobile-menu" class="mobile-menu slideout-menu">
+  <ul class="mobile-menu-list"><a href="/">
+        <li class="mobile-menu-item">Home
+          </li>
+      </a></ul>
+</nav>
+<div class="container" id="mobile-panel">
+      <header id="header" class="header"><div class="logo-wrapper">
+  <a href="/." class="logo">mumbo jumbo</a>
+</div>
+
+<nav class="site-navbar"><ul id="menu" class="menu"><li class="menu-item">
+          <a class="menu-item-link" href="/">
+            Home
+            </a>
+        </li>
+      </ul></nav>
+</header>
+
+      <main id="main" class="main">
+        <div class="content-wrapper">
+          <div id="content" class="content"><article class="post">
+    <header class="post-header">
+      <h1 class="post-title">Effective C++ - Resource Management
+        </h1>
+
+      <div class="post-meta">
+        <span class="post-time">
+          2020-01-30
+        </span></div>
+    </header>
+
+    <div class="post-toc" id="post-toc">
+    <h2 class="post-toc-title">Contents</h2>
+    <div class="post-toc-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#3-Resource-Management"><span class="toc-text">3. Resource Management</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Item-13-Use-objects-to-manage-resources"><span class="toc-text">Item 13: Use objects to manage resources.</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Item-14-Think-carefully-about-copying-behavior-in-resource-managing-classes"><span class="toc-text">Item 14: Think carefully about copying behavior in resource-managing classes.</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Item-15-Provide-access-to-raw-resources-in-resource-managing-classes"><span class="toc-text">Item 15: Provide access to raw resources in resource-managing classes</span></a></li></ol></li></ol>
+    </div>
+  </div><div class="post-content"><h2 id="3-Resource-Management"><a href="#3-Resource-Management" class="headerlink" title="3. Resource Management"></a>3. Resource Management</h2><h3 id="Item-13-Use-objects-to-manage-resources"><a href="#Item-13-Use-objects-to-manage-resources" class="headerlink" title="Item 13: Use objects to manage resources."></a>Item 13: Use objects to manage resources.</h3><ol>
+<li><p>以工厂模式的获取方式作为切入点，强调在外层函数f内，获取指针是通过函数返回，没有明显的new操作，但是需要手动delete，而且需要人工保证f函数的每一个出口都需要写delete，增加了维护代码的复杂性，因为每个增加的函数出口都需要添加。</p>
+</li>
+<li><p>改进办法一：把资源放进对象内（RAII，Resource Acquisition is Initialization），便可以依赖”C++析构函数自动调用机制“确保资源被释放。<br> 这个办法有两个关键点：获得资源后<strong>立刻</strong>放进管理对象内:</p>
+<pre class="line-numbers language-cpp"><code class="language-cpp"> <span class="token keyword">void</span> <span class="token function">f</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+     std<span class="token operator">::</span>auto_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pInv</span><span class="token punctuation">(</span><span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+ <span class="token punctuation">}</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p> 不论是赋值还是初始化，都需要在获得的同时立刻被放进管理对象内。<br> 第二个关键点是：管理对象运用析构函数确保资源被释放。正常析构情况下没问题，但是如果资源释放的动作可能导致抛出异常，事情就会很棘手，但是参照<strong>Item 8</strong>就能避免发生。</p>
+</li>
+<li><p>auto_ptr的潜在问题：根据<a href="https://en.cppreference.com/w/cpp/memory/auto_ptr" target="_blank" rel="noopener">auto_ptr的官方定义</a>：</p>
+<blockquote>
+<p><code>auto_ptr</code> is a smart pointer that manages an object obtained via new expression and deletes that object when <code>auto_ptr</code> itself is destroyed. </p>
+</blockquote>
+<p><code>auto_ptr</code>被销毁时会自动删除它所指之物，所以一定要注意别让多个<code>auto_ptr</code>同时指向同一个对象,不然多次删除一个对象,造成“未定义行为”.<code>auto_ptr</code>有一个不同寻常的性质:<strong>若通过copy构造函数或copy assignment操作符复制它们,它们会变成null,而复制所得的指针将取得资源唯一拥有权.</strong></p>
+<pre class="line-numbers language-cpp"><code class="language-cpp"><span class="token punctuation">{</span>
+    auto_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pInv1</span><span class="token punctuation">(</span><span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    auto_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pInv2</span><span class="token punctuation">(</span>pInv1<span class="token punctuation">)</span><span class="token punctuation">;</span>     <span class="token comment" spellcheck="true">// pInv2指向对象,pInv1被设为null</span>
+    pInv1 <span class="token operator">=</span> pInv2<span class="token punctuation">;</span>                     <span class="token comment" spellcheck="true">// pInv1指向对象, pInv1被设为null</span>
+<span class="token punctuation">}</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>因为auto_ptr的这些诡异行为,意味auto_ptr并非管理动态分配资源的神兵利器.</p>
+</li>
+<li><p>auto_ptr的替代方案是:”引用计数型智慧指针”(reference-counting smart pointer, <code>RCSP</code>).RCSP提供类似垃圾回收(garbage collection, <code>GC</code>). 但是RCSP也有需要注意的地方,环状引用(cycles of references, 例如两个其实已经没被使用的对象彼此互指,因而好像还处在“被使用”状态).</p>
+<pre class="line-numbers language-cpp"><code class="language-cpp"><span class="token punctuation">{</span>
+    shared_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pInv</span><span class="token punctuation">(</span><span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    shared_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pInv2</span><span class="token punctuation">(</span>pInv1<span class="token punctuation">)</span><span class="token punctuation">;</span>     <span class="token comment" spellcheck="true">// pInv1和pInv2指向同一个对象</span>
+    pInv1 <span class="token operator">=</span> pInv2<span class="token punctuation">;</span>                         <span class="token comment" spellcheck="true">// 同上</span>
+ <span class="token punctuation">}</span>     <span class="token comment" spellcheck="true">// pInv1和pInv2被销毁, 它们所指的对象也就被自动销毁</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>shared_ptr也就是一种RCSP. 上述是它和auto_ptr在复制行为上的不同.但是这条item并不是只针对shared_ptr,只是强调“以对象管理资源”的重要性. </p>
+<p><code>auto_ptr</code>和<code>shared_ptr</code>两者的在其析构函数内部做<code>delete</code>而不是<code>delete[]</code>动作.那意味着在动态分配而得到的<code>array</code>身上不要使用<code>auto_ptr</code>和<code>shared_ptr</code>.尽管如此,但是这样写仍然能通过编译:</p>
+<pre class="line-numbers language-cpp"><code class="language-cpp">auto_ptr<span class="token operator">&lt;</span>string<span class="token operator">></span> <span class="token function">aps</span><span class="token punctuation">(</span><span class="token keyword">new</span> string<span class="token punctuation">[</span><span class="token number">10</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>     <span class="token comment" spellcheck="true">//馊主意,会用上错误的delete形式</span>
+shared_ptr<span class="token operator">&lt;</span><span class="token keyword">int</span><span class="token operator">></span> <span class="token function">spi</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token keyword">int</span><span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>     <span class="token comment" spellcheck="true">//相同问题</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+</li>
+</ol>
+<p>批注1:<code>auto_ptr</code>在C11标准中已经是<code>deprecated</code>状态.</p>
+<p>批注2: 类似于本例中使用的<code>createInvest()</code>返回的“未加工指针”(<code>raw pointer</code>)是资源泄露的一个重大隐患,即使使用<code>auto_ptr</code>和<code>shared_ptr</code>,也必须记得将他的返回值存储在智能指针对象内.更好的解决办法是针对<code>createInvest</code>接口进行修改,可参照<code>Item 18</code>.</p>
+<h3 id="Item-14-Think-carefully-about-copying-behavior-in-resource-managing-classes"><a href="#Item-14-Think-carefully-about-copying-behavior-in-resource-managing-classes" class="headerlink" title="Item 14: Think carefully about copying behavior in resource-managing classes."></a>Item 14: Think carefully about copying behavior in resource-managing classes.</h3><p>这条讲的是自己写<code>RAII Class</code>应该注意的地方,但是实际中很少需要自己手写<code>RAII Class</code>来管理资源,文中举例的<code>mutex</code>的<code>lock</code>也有了对应的标准库函数.</p>
+<p>但是其中有两点,对底层资源祭出”引用计数法”中提到,<code>shared_ptr</code>的构造函数中给定<code>deleter</code>,可以控制当<code>shared_ptr</code>计数为0的时候需要做的事情.这个方法在其他场景也可以使用到.</p>
+<p>第二点是<code>deep copy</code>深度拷贝的处理方法,也可以在其他场景中使用到.</p>
+<p>总的来说,这条主要记住如果要自己写<code>RAII Class</code>,有哪四种主要的方法.更多的是把这四种方法当做启发性的通用解决方法,在遇到其他情况的时候能够举一反三.</p>
+<h3 id="Item-15-Provide-access-to-raw-resources-in-resource-managing-classes"><a href="#Item-15-Provide-access-to-raw-resources-in-resource-managing-classes" class="headerlink" title="Item 15: Provide access to raw resources in resource-managing classes"></a>Item 15: Provide access to raw resources in resource-managing classes</h3><p><code>RAII</code>很美好,但是现状是仍然有很多情况必须要使用<code>raw resource</code>.某些情况下的接口需要的<code>raw pointer</code>,但是传一个<code>auto_ptr</code>或者<code>shared_ptr</code>的对象,就会编译出错.两种解决办法:</p>
+<ol>
+<li><p>显示转换<br>提供<code>get()</code>函数,返回智能指针内部的原始指针(的复件).</p>
+</li>
+<li><p>隐式转换</p>
+<ol>
+<li><p>几乎所有的智能指针,都重载了指针取值(<code>pointer dereferencing</code>)操作符<code>operator-&gt;</code>和<code>operator*</code>,他们允许隐式转换至底部原始指针:</p>
+<pre class="line-numbers language-cpp"><code class="language-cpp"><span class="token keyword">class</span> <span class="token class-name">Invest</span> <span class="token punctuation">{</span>                <span class="token comment" spellcheck="true">// investment集成体系的根类</span>
+    <span class="token keyword">public</span><span class="token operator">:</span>
+    <span class="token keyword">bool</span> <span class="token function">isTaxFree</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">const</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+Invest<span class="token operator">*</span> <span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>            <span class="token comment" spellcheck="true">// factory函数</span>
+shared_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pi1</span><span class="token punctuation">(</span><span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>    
+<span class="token keyword">bool</span> taxable1 <span class="token operator">=</span> <span class="token operator">!</span><span class="token punctuation">(</span>pil<span class="token operator">-</span><span class="token operator">></span><span class="token function">isTaxFree</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>    <span class="token comment" spellcheck="true">// 经由operator->访问资源</span>
+
+auto_ptr<span class="token operator">&lt;</span>Invest<span class="token operator">></span> <span class="token function">pi2</span><span class="token punctuation">(</span><span class="token function">createInvest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">bool</span> taxable2 <span class="token operator">=</span> <span class="token operator">!</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">*</span>pi2<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isTaxFree</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>    <span class="token comment" spellcheck="true">// 经由operator*访问资源</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</li>
+<li><p>第二种隐式转换是有些人会觉得<code>get()</code>方法很麻烦,</p>
+</li>
+</ol>
+</li>
+</ol>
+
+      </div>
+      
+      <footer class="post-footer">
+        <div class="post-tags">
+            <a href="/tags/cpp/">cpp</a>
+            <a href="/tags/RAII/">RAII</a>
+            </div>
+        
+        <nav class="post-nav"></nav></footer>
+    </article></div><div class="comments" id="comments"></div></div>
+      </main>
+
+      <footer id="footer" class="footer"><div class="social-links"><a href="/atom.xml" class="iconfont icon-rss" title="rss"></a>
+    </div><div class="copyright">
+  <span class="power-by">
+    Powered by <a class="hexo-link" href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>
+  </span>
+  <span class="division">|</span>
+  <span class="theme-info">
+    Theme - 
+    <a class="theme-link" href="https://github.com/ahonn/hexo-theme-even" target="_blank" rel="noopener">Even</a>
+  </span>
+
+  <span class="copyright-year">&copy;2015 - 2020<span class="heart">
+      <i class="iconfont icon-heart"></i>
+    </span>
+    <span class="author">zeh</span>
+  </span>
+</div>
+</footer>
+
+      <div class="back-to-top" id="back-to-top">
+        <i class="iconfont icon-up"></i>
+      </div>
+    </div><script type="text/javascript" src="/lib/jquery/jquery.min.js"></script>
+  <script type="text/javascript" src="/lib/slideout/slideout.js"></script>
+  <script type="text/javascript" src="/lib/fancybox/jquery.fancybox.pack.js"></script>
+  <script type="text/javascript" src="/js/src/even.js?v=2.11.0"></script>
+</body>
+</html>
